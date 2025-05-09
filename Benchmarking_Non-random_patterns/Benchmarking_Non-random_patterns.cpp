@@ -563,118 +563,113 @@ string read_fasta(const string& filepath) {
 
 
 void run_benchmark(const string& genome, const string& name) {
-    vector<string> patterns = {
-        "CCTG",                                         // Real Data Pattern 4bp
-        "AAAA",
-        "ATAT",
-        "CAACAA",
-
-
-        "GGAATTCC",                                     // Real Data Pattern 8bp
-        "AAAAAAAA",
-        "CACACACA",
-        "CAACAACAA",      
-
-
-        "CTCTTTGAGAAG",                                 // Real Data Pattern 12bp
-        "AAAAAAAAAAAA",
-        "CACACACACACA",
-        "TAATAATAATAA",
-
-
-        "TATACATACACGCACACA",                           // Real Data Pattern 18bp
-        "AAAAAAAAAAAAAAAAAA",
-        "CACACACACACACACACA",
-        "CAACAACAACAACAACAA",
-
-
-        "GGGAGGGCTGCTAGTCCAGGCTGT",                     // Real Data Pattern 24bp
-        "AAAAAAAAAAAAAAAAAAAAAAAA",
-        "CACACACACACACACACACACACA",
-        "GAAGAAGAAGAAGAAGAAGAAGAA",
-
-
-        "CAACAACAACAACAACAACAACAACAACAA",  
-        "AGGGCTACATGTGATGGATGTGGAATATAGCA",              // Real Data Pattern 32bp
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "ACACACACACACACACACACACACACACACAC",  
+    // Organized patterns
+    vector<pair<string, vector<string>>> categorized_patterns = {
+        {"Mono-nucleotide Repeats (Homopolymers)", {
+            "AAAA",
+            "AAAAAAAA",
+            "AAAAAAAAAAAA",
+            "AAAAAAAAAAAAAAAAAA",
+            "AAAAAAAAAAAAAAAAAAAAAAAA",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }},
+        {"Di-nucleotide Repeats (2 bp motifs)", {
+            "ATAT",                // (AT)₂
+            "CACACACA",            // (CA)₄
+            "CACACACACACA",        // (CA)₆
+            "CACACACACACACACACA",  // (CA)₉ (imperfect, odd repeat)
+            "ACACACACACACACACACACACACACACACAC" // (AC)₁₆
+        }},
+        {"Tri-nucleotide Repeats (3 bp motifs)", {
+            "CAACAA",              // (CAA)₂
+            "CAACAACAA",           // (CAA)₃
+            "TAATAATAATAA",        // (TAA)₄
+            "CAACAACAACAACAACAA",  // (CAA)₆
+            "GAAGAAGAAGAAGAAGAAGAA", // (GAA)₇
+            "CAACAACAACAACAACAACAACAACAACAA" // (CAA)₁₀
+        }},
+        {"Real Data Patterns (Non-repeating/Long/Complex)", {
+            "CCTG",                // 4 bp, non-repeating
+            "GGAATTCC",            // 8 bp, non-repeating
+            "CTCTTTGAGAAG",        // 12 bp, no clear repeat
+            "TATACATACACGCACACA",  // 18 bp, no clear repeat
+            "GGGAGGGCTGCTAGTCCAGGCTGT", // 24 bp, no clear repeat
+            "AGGGCTACATGTGATGGATGTGGAATATAGCA" // 32 bp, non-repeating
+        }}
     };
 
 
     cout << "\n=== Benchmarking on " << name << " (" << genome.size() << "bp) ===" << endl;
-    cout << "Algorithm               | Pattern Length | Matches | Time (ms)" << endl;
-    cout << "------------------------|----------------|---------|----------" << endl;
 
+    for (const auto& category : categorized_patterns) {
+        cout << "\n=== " << category.first << " ===" << endl;
 
-    for (const string& pattern : patterns) {
-        int pattern_len = pattern.size();
-       
-        // Print the pattern as a header
-        cout << "\n" << pattern << endl;
+        for (const string& pattern : category.second) {
+            int pattern_len = pattern.size();
 
-        // Standard Boyer-Moore
-        auto start = chrono::high_resolution_clock::now();
-        vector<int> matches_bm = boyer_moore(genome, pattern);
-        auto end = chrono::high_resolution_clock::now();
-        double time_bm = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
-        printf("Boyer-Moore          | %14d | %7d | %8.4f\n",
-               pattern_len, (int)matches_bm.size(), time_bm);
+            // Print the pattern as a header
+            cout << "\n" << pattern << endl;
+            cout << "Algorithm               | Pattern Length | Matches | Time (ms)" << endl;
+            cout << "------------------------|----------------|---------|----------" << endl;
 
+            // Standard Boyer-Moore
+            auto start = chrono::high_resolution_clock::now();
+            vector<int> matches_bm = boyer_moore(genome, pattern);
+            auto end = chrono::high_resolution_clock::now();
+            double time_bm = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
+            printf("Boyer-Moore          | %14d | %7d | %8.4f\n",
+                   pattern_len, (int)matches_bm.size(), time_bm);
 
-        // Boyer-Moore-Horspool
-        start = chrono::high_resolution_clock::now();
-        vector<int> matches_bmh = BMHAlgorithm(genome, pattern);
-        end = chrono::high_resolution_clock::now();
-        double time_bmh = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
-        printf("Boyer-Moore-Horspool | %14d | %7d | %8.4f\n",
-               pattern_len, (int)matches_bmh.size(), time_bmh);
+            // Boyer-Moore-Horspool
+            start = chrono::high_resolution_clock::now();
+            vector<int> matches_bmh = BMHAlgorithm(genome, pattern);
+            end = chrono::high_resolution_clock::now();
+            double time_bmh = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
+            printf("Boyer-Moore-Horspool | %14d | %7d | %8.4f\n",
+                   pattern_len, (int)matches_bmh.size(), time_bmh);
 
+            // Turbo Boyer-Moore
+            start = chrono::high_resolution_clock::now();
+            vector<int> matches_turbo = TurboBM(genome, pattern);
+            end = chrono::high_resolution_clock::now();
+            double time_turbo = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
+            printf("Turbo Boyer-Moore    | %14d | %7d | %8.4f\n",
+                   pattern_len, (int)matches_turbo.size(), time_turbo);
 
-        // Turbo Boyer-Moore
-        start = chrono::high_resolution_clock::now();
-        vector<int> matches_turbo = TurboBM(genome, pattern);
-        end = chrono::high_resolution_clock::now();
-        double time_turbo = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
-        printf("Turbo Boyer-Moore    | %14d | %7d | %8.4f\n",
-               pattern_len, (int)matches_turbo.size(), time_turbo);
+            // Shift-Or algorithm
+            start = chrono::high_resolution_clock::now();
+            vector<int> matches_shiftor = ShiftOr(genome, pattern);
+            end = chrono::high_resolution_clock::now();
+            double time_shiftor = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
+            printf("Shift-Or             | %14d | %7d | %8.4f\n",
+                   pattern_len, (int)matches_shiftor.size(), time_shiftor);
 
+            // SIMD Shift-Or Boyer-Moore Hybrid
+            start = chrono::high_resolution_clock::now();
+            vector<int> matches_shiftbm = BMShiftOr_Hybrid(genome, pattern);
+            end = chrono::high_resolution_clock::now();
+            double time_shiftbm = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
+            printf("BM Shift-Or Hybrid   | %14d | %7d | %8.4f\n",
+                   pattern_len, (int)matches_shiftbm.size(), time_shiftbm);
 
-        // Shift-Or algorithm
-        start = chrono::high_resolution_clock::now();
-        vector<int> matches_shiftor = ShiftOr(genome, pattern);
-        end = chrono::high_resolution_clock::now();
-        double time_shiftor = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
-        printf("Shift-Or             | %14d | %7d | %8.4f\n",
-               pattern_len, (int)matches_shiftor.size(), time_shiftor);
-       
-        // SIMD Shift-Or Boyer-Moore Hybrid
-        start = chrono::high_resolution_clock::now();
-        vector<int> matches_shiftbm = BMShiftOr_Hybrid(genome, pattern);
-        end = chrono::high_resolution_clock::now();
-        double time_shiftbm = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
-        printf("BM Shift-Or Hybrid   | %14d | %7d | %8.4f\n",
-                pattern_len, (int)matches_shiftbm.size(), time_shiftbm);
+            // KMP algorithm
+            start = chrono::high_resolution_clock::now();
+            vector<int> matches_kmp = KMP(genome, pattern);
+            end = chrono::high_resolution_clock::now();
+            double time_kmp = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
+            printf("KMP                  | %14d | %7d | %8.4f\n",
+                   pattern_len, (int)matches_kmp.size(), time_kmp);
 
+            // Rabin-Karp algorithm
+            start = chrono::high_resolution_clock::now();
+            vector<int> matches_rk = RabinKarp(genome, pattern);
+            end = chrono::high_resolution_clock::now();
+            double time_rk = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
+            printf("Rabin-Karp           | %14d | %7d | %8.4f\n",
+                   pattern_len, (int)matches_rk.size(), time_rk);
 
-        // KMP algorithm
-        start = chrono::high_resolution_clock::now();
-        vector<int> matches_kmp = KMP(genome, pattern);
-        end = chrono::high_resolution_clock::now();
-        double time_kmp = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
-        printf("KMP                  | %14d | %7d | %8.4f\n",
-               pattern_len, (int)matches_kmp.size(), time_kmp);
-
-
-        // Rabin-Karp algorithm
-        start = chrono::high_resolution_clock::now();
-        vector<int> matches_rk = RabinKarp(genome, pattern);
-        end = chrono::high_resolution_clock::now();
-        double time_rk = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
-        printf("Rabin-Karp           | %14d | %7d | %8.4f\n",
-               pattern_len, (int)matches_rk.size(), time_rk);
-
-
-        cout << "------------------------|----------------|---------|----------" << endl;
+            cout << "------------------------|----------------|---------|----------" << endl;
+        }
     }
 }
 
