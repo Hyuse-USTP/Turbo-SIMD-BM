@@ -3,6 +3,7 @@
         "*.embeddedhtml": "html",
         "*.java": "java",
         "benchmarking_non-random_patterns": "cpp",
-        "format": "cpp"
+        "format": "cpp",
+        "iostream": "cpp"
     }
 }

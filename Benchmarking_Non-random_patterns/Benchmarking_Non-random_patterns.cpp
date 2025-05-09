@@ -609,6 +609,9 @@ void run_benchmark(const string& genome, const string& name) {
     for (const string& pattern : patterns) {
         int pattern_len = pattern.size();
        
+        // Print the pattern as a header
+        cout << "\n" << pattern << endl;
+
         // Standard Boyer-Moore
         auto start = chrono::high_resolution_clock::now();
         vector<int> matches_bm = boyer_moore(genome, pattern);
@@ -669,8 +672,6 @@ void run_benchmark(const string& genome, const string& name) {
         double time_rk = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
         printf("Rabin-Karp           | %14d | %7d | %8.4f\n",
                pattern_len, (int)matches_rk.size(), time_rk);
-
-
 
 
         cout << "------------------------|----------------|---------|----------" << endl;
