@@ -543,6 +543,177 @@ vector<int> RabinKarp(const string& text, const string& pattern) {
     return matches;
 }
 
+// Shift-Or for SIMD Boyer-Moore
+vector<int> ShiftOrforSIMDBM(const string& text, const string& pattern) {
+    vector<int> matches;
+    const char* t = text.data();
+    const char* p = pattern.data();
+    const int n = text.size();
+    const int m = pattern.size();
+    if (m == 0) return matches;
+
+    unsigned int mask[256];
+    for (int i = 0; i < 256; i++) mask[i] = ~0U;
+    for (int i = 0; i < m; i++) {
+        mask[(unsigned char)pattern[i]] &= ~(1U << i);
+    }
+
+    const unsigned int goal = 1U << (m - 1);
+    unsigned int state = ~0U;
+
+    for (int i = 0; i < n; i++) {
+        state = (state << 1) | mask[(unsigned char)t[i]];
+        if ((state & goal) == 0) {
+            matches.push_back(i - m + 1);
+        }
+    }
+
+    return matches;
+}
+
+bool is_repetitive(const string& pattern) {
+    const size_t len = pattern.size();
+    if (len <= 4) return false;
+
+    // 1. Check pure homopolymers (AAAAA, CCCCC, etc.)
+    const char first = pattern[0];
+    bool pure_homopolymer = true;
+    for (size_t i = 1; i < len; i++) {
+        if (pattern[i] != first) {
+            pure_homopolymer = false;
+            break;
+        }
+    }
+    if (pure_homopolymer) return true;
+
+    // 2. Check dinucleotide repeats only (e.g., CACACACA)
+    if (len >= 4) {
+        const char a = pattern[0];
+        const char b = pattern[1];
+        bool perfect_dinucleotide = true;
+        
+        for (size_t i = 2; i < len; i++) {
+            char expected = (i % 2 == 0) ? a : b;
+            if (pattern[i] != expected) {
+                perfect_dinucleotide = false;
+                break;
+            }
+        }
+        
+        if (perfect_dinucleotide) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+vector<int> SIMDBM(const string& text, const string& pattern) {
+    vector<int> matches;
+    const char* t = text.data();
+    const char* p = pattern.data();
+    const int n = text.size();
+    const int m = pattern.size();
+    if (m == 0 || m > 32) return matches;
+
+    bool use_shift_or = m <= 16;
+
+    if (use_shift_or) {
+        return ShiftOrforSIMDBM(text, pattern);
+    }
+
+    int bad_char[256];
+    fill_n(bad_char, 256, -1);
+    for (int i = 0; i < m; i++) {
+        bad_char[(unsigned char)p[i]] = i;
+    }
+
+    vector<int> good_suffix(m + 1, m);
+    vector<int> border_pos(m + 1, 0);
+    int i = m, j = m + 1;
+
+    border_pos[i] = j;
+    while (i > 0) {
+        while (j <= m && p[i - 1] != p[j - 1]) {
+            if (good_suffix[j] == m) {
+                good_suffix[j] = j - i;
+            }
+            j = border_pos[j];
+        }
+        i--; j--;
+        border_pos[i] = j;
+    }
+    j = border_pos[0];
+    for (i = 0; i <= m; i++) {
+        if (good_suffix[i] == m) {
+            good_suffix[i] = j;
+        }
+        if (i == j) {
+            j = border_pos[j];
+        }
+    }
+
+    const bool use_simd = is_repetitive(pattern);
+    const int simd_width = 16;
+    __m128i p_simd1 = _mm_loadu_si128((const __m128i*)p);
+    __m128i p_simd2;
+    if (m > simd_width) {
+        p_simd2 = _mm_loadu_si128((const __m128i*)(p + simd_width));
+    }
+
+    i = 0;
+    while (i <= n - m) {
+        if (use_simd) {
+            if (p[m - 1] != t[i + m - 1]) {
+                int bc_skip = bad_char[(unsigned char)t[i + m - 1]];
+                i += max(1, (bc_skip == -1) ? m : (m - 1 - bc_skip));
+                continue;
+            }
+            
+            bool match = true;
+            __m128i t_simd1 = _mm_loadu_si128((const __m128i*)(t + i));
+            uint32_t mask1 = _mm_movemask_epi8(_mm_cmpeq_epi8(p_simd1, t_simd1));
+            uint32_t expected_mask1 = (1U << min(m, simd_width)) - 1;
+
+            if ((mask1 & expected_mask1) != expected_mask1) {
+                match = false;
+            }
+            if (match && m > simd_width) {
+                __m128i t_simd2 = _mm_loadu_si128((const __m128i*)(t + i + simd_width));
+                uint32_t mask2 = _mm_movemask_epi8(_mm_cmpeq_epi8(p_simd2, t_simd2));
+                uint32_t expected_mask2 = (1U << (m - simd_width)) - 1;
+                if ((mask2 & expected_mask2) != expected_mask2) {
+                    match = false;
+                }
+            }
+            if (match) {
+                matches.push_back(i);
+                i += good_suffix[0];
+            } else {
+                int j = m - 1;
+                while (j >= 0 && p[j] == t[i + j]) {
+                    j--;
+                }
+                i += max(1, good_suffix[j + 1]);
+            }
+        } else {
+            int j = m - 1;
+            while (j >= 0 && p[j] == t[i + j]) {
+                j--;
+            }
+            if (j < 0) {
+                matches.push_back(i);
+                i += good_suffix[0];
+            } else {
+                int bc_shift = j - bad_char[(unsigned char)t[i + j]];
+                int gs_shift = good_suffix[j + 1];
+                i += max(bc_shift, gs_shift);
+            }
+        }
+    }
+    return matches;
+}
+
 
 string read_fasta(const string& filepath) {
     ifstream file(filepath);
@@ -667,6 +838,15 @@ void run_benchmark(const string& genome, const string& name) {
             double time_rk = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
             printf("Rabin-Karp           | %14d | %7d | %8.4f\n",
                    pattern_len, (int)matches_rk.size(), time_rk);
+
+            // SIMD Boyer-Moore
+            start = chrono::high_resolution_clock::now();
+            vector<int> matches_simdbm = SIMDBM(genome, pattern);
+            end = chrono::high_resolution_clock::now();
+            double time_simdbm = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
+            printf("SIMD Boyer-Moore     | %14d | %7d | %8.4f\n",
+                   pattern_len, (int)matches_simdbm.size(), time_simdbm);
+
 
             cout << "------------------------|----------------|---------|----------" << endl;
         }
