@@ -11,11 +11,7 @@
 #include <algorithm>
 #include <cstring>
 
-
 using namespace std;
-
-
-
 
 // Standard Boyer-Moore algorithm with bad character and good suffix heuristics
 vector<int> bad_character_heuristic(const string& pattern) {
@@ -26,12 +22,10 @@ vector<int> bad_character_heuristic(const string& pattern) {
     return bad_char;
 }
 
-
 vector<int> compute_good_suffix(const string& pattern) {
     int m = pattern.size();
     vector<int> good_suffix(m + 1, m);
     vector<int> border(m + 1);
-
 
     int i = m, j = m + 1;
     border[i] = j;
@@ -46,7 +40,6 @@ vector<int> compute_good_suffix(const string& pattern) {
         border[i] = j;
     }
 
-
     j = border[0];
     for (i = 0; i <= m; i++) {
         if (good_suffix[i] == m) {
@@ -57,17 +50,14 @@ vector<int> compute_good_suffix(const string& pattern) {
         }
     }
 
-
     return good_suffix;
 }
-
 
 vector<int> boyer_moore(const string& text, const string& pattern) {
     vector<int> bad_char = bad_character_heuristic(pattern);
     vector<int> good_suffix = compute_good_suffix(pattern);
     vector<int> matches;
     int n = text.size(), m = pattern.size();
-
 
     int shift = 0;
     while (shift <= n - m) {
@@ -87,7 +77,6 @@ vector<int> boyer_moore(const string& text, const string& pattern) {
     return matches;
 }
 
-
 // Boyer-Moore-Horspool (BMH) algorithm
 vector<int> BMHAlgorithm(const string& text, const string& pattern) {
     vector<int> matches;
@@ -95,13 +84,11 @@ vector<int> BMHAlgorithm(const string& text, const string& pattern) {
     int m = pattern.size();
     if (m == 0 || n < m) return matches;
 
-
     int badCharShift[256];
     for (int i = 0; i < 256; i++) badCharShift[i] = m;
     for (int i = 0; i < m - 1; i++) {
         badCharShift[(unsigned char)pattern[i]] = m - 1 - i;
     }
-
 
     int i = 0;
     while (i <= n - m) {
@@ -109,7 +96,6 @@ vector<int> BMHAlgorithm(const string& text, const string& pattern) {
         while (j >= 0 && pattern[j] == text[i + j]) {
             j--;
         }
-
 
         if (j < 0) {
             matches.push_back(i);
@@ -121,7 +107,6 @@ vector<int> BMHAlgorithm(const string& text, const string& pattern) {
     return matches;
 }
 
-
 // Turbo Boyer-Moore (Turbo BM) algorithm
 vector<int> TurboBM(const string& text, const string& pattern) {
     vector<int> matches;
@@ -129,17 +114,14 @@ vector<int> TurboBM(const string& text, const string& pattern) {
     int m = pattern.size();
     if (m == 0 || n < m) return matches;
 
-
     int bad_char[256];
     for (int i = 0; i < 256; i++) bad_char[i] = -1;
     for (int i = 0; i < m; i++) {
         bad_char[(unsigned char)pattern[i]] = i;
     }
 
-
     vector<int> good_suffix(m + 1, m);
     vector<int> border_pos(m + 1, 0);
-
 
     int i = m, j = m + 1;
     border_pos[i] = j;
@@ -154,7 +136,6 @@ vector<int> TurboBM(const string& text, const string& pattern) {
         border_pos[i] = j;
     }
 
-
     j = border_pos[0];
     for (i = 0; i <= m; i++) {
         if (good_suffix[i] == m) {
@@ -165,10 +146,8 @@ vector<int> TurboBM(const string& text, const string& pattern) {
         }
     }
 
-
     int shift = 0;
     int prev_match_len = 0;  // Track previous match length
-
 
     while (shift <= n - m) {
         int curr_match_len = 0;
@@ -177,7 +156,6 @@ vector<int> TurboBM(const string& text, const string& pattern) {
             j--;
             curr_match_len++;  // Count matched characters
         }
-
 
         if (j < 0) {
             matches.push_back(shift);
@@ -192,14 +170,12 @@ vector<int> TurboBM(const string& text, const string& pattern) {
                             ? (prev_match_len + 1)
                             : gs_shift;
 
-
             shift += max(bc_shift, turbo_shift);
             prev_match_len = curr_match_len;  // Update for next iteration
         }
     }
     return matches;
 }
-
 
 // Shift-Or implementation with 256-element array
 vector<int> ShiftOr(const string& text, const string& pattern) {
@@ -230,212 +206,6 @@ vector<int> ShiftOr(const string& text, const string& pattern) {
    
     return matches;
 }
-
-
-// Boyer-Moore and SIMD Optimized Shift-Or Hybrid
-vector<int> ShiftSIMD(const string& text, const string& pattern) {
-    vector<int> matches;
-    const char* t = text.data();
-    const char* p = pattern.data();
-    const int n = text.size();
-    const int m = pattern.size();
-    if (m == 0) return matches;
-
-
-    unsigned int mask[256];
-    for (int i = 0; i < 256; i++) mask[i] = ~0U;
-    for (int i = 0; i < m; i++) {
-        mask[(unsigned char)pattern[i]] &= ~(1U << i);
-    }
-
-
-    const unsigned int goal = 1U << (m - 1);
-
-
-    if (m <= 16) {
-        unsigned int state = ~0U;
-
-
-        for (int i = 0; i < n; i++) {
-            state = (state << 1) | mask[(unsigned char)t[i]];
-            if ((state & goal) == 0) {
-                matches.push_back(i - m + 1);
-            }
-        }
-        return matches;
-    }
-
-
-    const int simd_width = 16;
-    __m128i p_simd = _mm_loadu_si128((const __m128i*)p);
-
-
-    for (int i = 0; i <= n - m; i++) {
-        if (i <= n - simd_width) {
-            __m128i t_simd = _mm_loadu_si128((const __m128i*)(t + i));
-            uint32_t cmp = _mm_movemask_epi8(_mm_cmpeq_epi8(p_simd, t_simd));
-
-
-
-
-            if (cmp != 0xFFFF) {
-                continue;
-            }
-        }
-        unsigned int state = (~0U) << simd_width;
-
-
-        for (int j = simd_width; j < m; j++) {
-            state = (state << 1) | mask[(unsigned char)t[i + j]];
-            if ((state & goal) == 0) {
-                matches.push_back(i);
-                break;
-            }
-        }
-    }
-    return matches;
-}
-
-
-
-
-bool is_extremely_repetitive(const string& pattern) {
-    const size_t len = pattern.size();
-    if (len <= 4) return false;
-
-
-    // 1. Check pure homopolymers (AAAAA, CCCCC, etc.)
-    const char first = pattern[0];
-    bool pure_homopolymer = true;
-    for (size_t i = 1; i < len; i++) {
-        if (pattern[i] != first) {
-            pure_homopolymer = false;
-            break;
-        }
-    }
-    if (pure_homopolymer) return true;
-
-
-    // 2. Check dinucleotide and trinucleotide repeats
-    const int max_unit_size = 3; // Check unit sizes up to 3bp
-    for (int unit_size = 1; unit_size <= max_unit_size && unit_size <= len/2; unit_size++) {
-        bool perfect_repeat = true;
-        const string unit = pattern.substr(0, unit_size);
-       
-        for (size_t i = unit_size; i < len; i++) {
-            if (pattern[i] != unit[i % unit_size]) {
-                perfect_repeat = false;
-                break;
-            }
-        }
-       
-        if (perfect_repeat) {
-            // Additional check for at least 3 full repeats
-            if (len >= 3 * unit_size) {
-                return true;
-            }
-        }
-    }
-
-
-    // 3. Special case: Partial trinucleotide repeats at end (e.g., CAACAA)
-    if (len >= 6) {  // Minimum for 2 full trinucleotide repeats
-        for (int unit_size = 2; unit_size <= 3; unit_size++) {
-            bool end_repeats = true;
-            const int repeat_count = len / unit_size;
-            const string unit = pattern.substr(0, unit_size);
-           
-            for (int r = 1; r < repeat_count; r++) {
-                for (int p = 0; p < unit_size; p++) {
-                    if (pattern[r * unit_size + p] != unit[p]) {
-                        end_repeats = false;
-                        break;
-                    }
-                }
-                if (!end_repeats) break;
-            }
-           
-            if (end_repeats) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-
-vector<int> BMShiftOr_Hybrid(const string& text, const string& pattern) {
-    vector<int> matches;
-    const char* t = text.data();
-    const char* p = pattern.data();
-    const int n = text.size();
-    const int m = pattern.size();
-    if (m == 0 || n < m) return matches;
-
-
-    bool use_shift_or = m <= 16 || is_extremely_repetitive(pattern);
-
-
-    if (use_shift_or) {
-        return ShiftSIMD(text, pattern);
-    }
-
-
-    int bad_char[256];
-    fill_n(bad_char, 256, -1);
-    for (int i = 0; i < m; i++) {
-        bad_char[(unsigned char)p[i]] = i;
-    }
-
-
-    vector<int> good_suffix(m + 1, m);
-    vector<int> border_pos(m + 1, 0);
-    int i = m, j = m + 1;
-    border_pos[i] = j;
-   
-    while (i > 0) {
-        while (j <= m && p[i - 1] != p[j - 1]) {
-            if (good_suffix[j] == m) {
-                good_suffix[j] = j - i;
-            }
-            j = border_pos[j];
-        }
-        i--; j--;
-        border_pos[i] = j;
-    }
-
-
-    j = border_pos[0];
-    for (i = 0; i <= m; i++) {
-        if (good_suffix[i] == m) {
-            good_suffix[i] = j;
-        }
-        if (i == j) {
-            j = border_pos[j];
-        }
-    }
-
-
-    int shift = 0;
-    while (shift <= n - m) {
-        int j = m - 1;
-        while (j >= 0 && p[j] == t[shift + j]) {
-            j--;
-        }
-
-
-        if (j < 0) {
-            matches.push_back(shift);
-            shift += good_suffix[0];
-        } else {
-            int bc_shift = j - bad_char[(unsigned char)t[shift + j]];
-            int gs_shift = good_suffix[j + 1];
-            shift += max(bc_shift, gs_shift);
-        }
-    }
-    return matches;
-}
-
 
 // Knuth-Morris-Pratt (KMP) algorithm
 vector<int> computeLPS(const string& pattern) {
@@ -493,11 +263,9 @@ vector<int> KMP(const string& text, const string& pattern) {
     return matches;
 }
 
-
 // Rabin-Karp algorithm
 const int BASE = 256;
 const int PRIME = 101;
-
 
 vector<int> RabinKarp(const string& text, const string& pattern) {
     vector<int> matches;
@@ -567,7 +335,6 @@ vector<int> ShiftOrforSIMDBM(const string& text, const string& pattern) {
             matches.push_back(i - m + 1);
         }
     }
-
     return matches;
 }
 
@@ -604,7 +371,6 @@ bool is_repetitive(const string& pattern) {
             return true;
         }
     }
-
     return false;
 }
 
@@ -722,7 +488,6 @@ string read_fasta(const string& filepath) {
         return "";
     }
 
-
     string sequence, line;
     while (getline(file, line)) {
         if (line.empty() || line[0] == '>') continue; // Skip header
@@ -751,14 +516,6 @@ void run_benchmark(const string& genome, const string& name) {
             "CACACACACACACACACA",  // (CA)₉ (imperfect, odd repeat)
             "ACACACACACACACACACACACACACACACAC" // (AC)₁₆
         }},
-        {"Tri-nucleotide Repeats (3 bp motifs)", {
-            "CAACAA",              // (CAA)₂
-            "CAACAACAA",           // (CAA)₃
-            "TAATAATAATAA",        // (TAA)₄
-            "CAACAACAACAACAACAA",  // (CAA)₆
-            "GAAGAAGAAGAAGAAGAAGAA", // (GAA)₇
-            "CAACAACAACAACAACAACAACAACAACAA" // (CAA)₁₀
-        }},
         {"Real Data Patterns (Non-repeating/Long/Complex)", {
             "CCTG",                // 4 bp, non-repeating
             "GGAATTCC",            // 8 bp, non-repeating
@@ -766,9 +523,8 @@ void run_benchmark(const string& genome, const string& name) {
             "TATACATACACGCACACA",  // 18 bp, no clear repeat
             "GGGAGGGCTGCTAGTCCAGGCTGT", // 24 bp, no clear repeat
             "AGGGCTACATGTGATGGATGTGGAATATAGCA" // 32 bp, non-repeating
-        }}
+        }},
     };
-
 
     cout << "\n=== Benchmarking on " << name << " (" << genome.size() << "bp) ===" << endl;
 
@@ -815,14 +571,6 @@ void run_benchmark(const string& genome, const string& name) {
             printf("Shift-Or             | %14d | %7d | %8.4f\n",
                    pattern_len, (int)matches_shiftor.size(), time_shiftor);
 
-            // SIMD Shift-Or Boyer-Moore Hybrid
-            start = chrono::high_resolution_clock::now();
-            vector<int> matches_shiftbm = BMShiftOr_Hybrid(genome, pattern);
-            end = chrono::high_resolution_clock::now();
-            double time_shiftbm = chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0;
-            printf("BM Shift-Or Hybrid   | %14d | %7d | %8.4f\n",
-                   pattern_len, (int)matches_shiftbm.size(), time_shiftbm);
-
             // KMP algorithm
             start = chrono::high_resolution_clock::now();
             vector<int> matches_kmp = KMP(genome, pattern);
@@ -847,7 +595,6 @@ void run_benchmark(const string& genome, const string& name) {
             printf("SIMD Boyer-Moore     | %14d | %7d | %8.4f\n",
                    pattern_len, (int)matches_simdbm.size(), time_simdbm);
 
-
             cout << "------------------------|----------------|---------|----------" << endl;
         }
     }
@@ -861,7 +608,6 @@ int main() {
         cerr << "Error: Failed to read DNA sequence" << endl;
         return 1;
     }
-
 
     run_benchmark(dna_sequence, "REAL DNA SEQUENCE");
    
