@@ -514,6 +514,7 @@ void run_benchmark(const string& genome, const string& name) {
             "CACACACA",            // (CA)₄
             "CACACACACACA",        // (CA)₆
             "CACACACACACACACACA",  // (CA)₉ (imperfect, odd repeat)
+            "CACACACACACACACACACACACA", // (CA)₁₁
             "ACACACACACACACACACACACACACACACAC" // (AC)₁₆
         }},
         {"Real Data Patterns (Non-repeating/Long/Complex)", {
